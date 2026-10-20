@@ -1,0 +1,89 @@
+name: Fork Windows Build
+
+# Unsigned Windows installer for this fork, uploaded as a workflow artifact.
+# Why a separate workflow: dev-channel-win-build.yml is pinned to stablyai/orca
+# and publishes with upstream secrets; this one publishes nothing.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-win:
+    if: github.repository == 'Glenno-H/orca'
+    # Why windows-2022: windows-latest's VS image breaks node-gyp native installs (see dev-channel-win-build.yml).
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
+
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-builder-win-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-win-
+
+      - name: Install dependencies
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm install --frozen-lockfile
+
+      - uses: ./.github/actions/install-mobile-dependencies
+
+      - name: Build app
+        shell: bash
+        run: pnpm build:release
+
+      - name: Package Windows installer
+        shell: pwsh
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        env:
+          ORCA_BUILD_COMMIT: ${{ github.sha }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: orca-windows-setup-${{ github.sha }}
+          path: dist/orca-windows-setup.exe
+          if-no-files-found: error
+          retention-days: 14
