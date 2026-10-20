@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { AlertTriangle, ChevronDown, Workflow } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,10 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { LinearAgentSkillSetupPrompt } from './LinearAgentSkillSetupPrompt'
 import WorktreeCardAgents from './WorktreeCardAgents'
+import WorktreeCardChats from './WorktreeCardChats'
+import { useWorktreeAgentRows } from './useWorktreeAgentRows'
+import { useWorktreeChatItems } from './use-worktree-chat-items'
+import { excludeChatAgentRows } from './worktree-chat-list-model'
 import type { WorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -35,6 +39,15 @@ export function WorktreeCardSecondaryRows({
     isDeleting
   } = card
   const { hasMetaRow } = presentation
+  const compactAgentRows = agentActivityDisplayMode === 'compact'
+  const fullAgentRows = useWorktreeAgentRows(worktree.id, showInlineAgentList && !compactAgentRows)
+  const inlineAgentRows = compactAgentRows ? compactInlineAgentRows : fullAgentRows
+  const chatItems = useWorktreeChatItems(worktree.id, inlineAgentRows, showInlineAgentList)
+  // Why: a listed chat already shows its agent, so only agents outside the chat list keep their own rows.
+  const unlistedAgentRows = useMemo(
+    () => excludeChatAgentRows(inlineAgentRows, chatItems),
+    [chatItems, inlineAgentRows]
+  )
 
   return (
     <>
@@ -86,11 +99,14 @@ export function WorktreeCardSecondaryRows({
 
       {/* Why: counterbalance the card stack gap (-mt-1) so agents right after the title read as one header group. */}
       {showInlineAgentList && (
-        <WorktreeCardAgents
-          worktreeId={worktree.id}
-          agents={agentActivityDisplayMode === 'compact' ? compactInlineAgentRows : undefined}
-          className={hasMetaRow || remoteBranchConflict ? 'mt-0' : '-mt-1'}
-        />
+        <>
+          <WorktreeCardChats
+            worktreeId={worktree.id}
+            items={chatItems}
+            className={hasMetaRow || remoteBranchConflict ? 'mt-0' : '-mt-1'}
+          />
+          <WorktreeCardAgents worktreeId={worktree.id} agents={unlistedAgentRows} />
+        </>
       )}
 
       {showLineageChildChip && (

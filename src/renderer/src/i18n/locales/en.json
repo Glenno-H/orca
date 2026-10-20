@@ -6908,6 +6908,13 @@
           "outsideDistro": "Pick a folder inside {{value0}}.",
           "underDistro": "This host can only add folders under \\\\wsl.localhost\\{{value0}}.",
           "windowsDrive": "Folders on a Windows drive stay on this computer. Choose this computer as the host to add one."
+        },
+        "WorktreeCardChats": {
+          "closeChat": "Close chat",
+          "renameChat": "Rename chat {{value0}}",
+          "renameAction": "Rename",
+          "chats": "Chats",
+          "newChat": "New chat"
         }
       },
       "shared": {
