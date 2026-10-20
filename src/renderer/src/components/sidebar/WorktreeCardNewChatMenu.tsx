@@ -69,7 +69,15 @@ export const WorktreeCardNewChatMenu = React.memo(function WorktreeCardNewChatMe
           </TooltipContent>
         </Tooltip>
       </span>
-      <DropdownMenuContent side="right" align="start" className="min-w-48">
+      <DropdownMenuContent
+        side="right"
+        align="start"
+        className="min-w-48"
+        onCloseAutoFocus={(event) => {
+          // Why: Radix restores focus to the "+" trigger on close, stealing it from the new chat.
+          event.preventDefault()
+        }}
+      >
         <NewChatAgentItems worktreeId={worktreeId} />
       </DropdownMenuContent>
     </DropdownMenu>
