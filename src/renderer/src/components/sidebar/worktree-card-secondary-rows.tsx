@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store'
 import { LinearAgentSkillSetupPrompt } from './LinearAgentSkillSetupPrompt'
 import WorktreeCardAgents from './WorktreeCardAgents'
 import WorktreeCardChats from './WorktreeCardChats'
@@ -39,10 +40,16 @@ export function WorktreeCardSecondaryRows({
     isDeleting
   } = card
   const { hasMetaRow } = presentation
-  const compactAgentRows = agentActivityDisplayMode === 'compact'
-  const fullAgentRows = useWorktreeAgentRows(worktree.id, showInlineAgentList && !compactAgentRows)
-  const inlineAgentRows = compactAgentRows ? compactInlineAgentRows : fullAgentRows
-  const chatItems = useWorktreeChatItems(worktree.id, inlineAgentRows, showInlineAgentList)
+  // Why: compact agent rows are only computed while the inline list shows; chats need rows in every card mode.
+  const usesCompactAgentRows = showInlineAgentList && agentActivityDisplayMode === 'compact'
+  // Why: a workspace without tabs has no chats, so skip the agent-row subscription there.
+  const hasTabs = useAppStore((s) => (s.unifiedTabsByWorktree?.[worktree.id]?.length ?? 0) > 0)
+  const fullAgentRows = useWorktreeAgentRows(
+    worktree.id,
+    !usesCompactAgentRows && (showInlineAgentList || hasTabs)
+  )
+  const inlineAgentRows = usesCompactAgentRows ? compactInlineAgentRows : fullAgentRows
+  const chatItems = useWorktreeChatItems(worktree.id, inlineAgentRows)
   // Why: a listed chat already shows its agent, so only agents outside the chat list keep their own rows.
   const unlistedAgentRows = useMemo(
     () => excludeChatAgentRows(inlineAgentRows, chatItems),
@@ -98,15 +105,13 @@ export function WorktreeCardSecondaryRows({
       ) : null}
 
       {/* Why: counterbalance the card stack gap (-mt-1) so agents right after the title read as one header group. */}
+      <WorktreeCardChats
+        worktreeId={worktree.id}
+        items={chatItems}
+        className={hasMetaRow || remoteBranchConflict ? 'mt-0' : '-mt-1'}
+      />
       {showInlineAgentList && (
-        <>
-          <WorktreeCardChats
-            worktreeId={worktree.id}
-            items={chatItems}
-            className={hasMetaRow || remoteBranchConflict ? 'mt-0' : '-mt-1'}
-          />
-          <WorktreeCardAgents worktreeId={worktree.id} agents={unlistedAgentRows} />
-        </>
+        <WorktreeCardAgents worktreeId={worktree.id} agents={unlistedAgentRows} />
       )}
 
       {showLineageChildChip && (
