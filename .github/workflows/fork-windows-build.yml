@@ -1,8 +1,8 @@
 name: Fork Windows Build
 
-# Unsigned Windows installer for this fork, uploaded as a workflow artifact.
+# Unsigned Windows installer for this fork, published as a release on this fork.
 # Why a separate workflow: dev-channel-win-build.yml is pinned to stablyai/orca
-# and publishes with upstream secrets; this one publishes nothing.
+# and publishes with upstream secrets; this one only touches Glenno-H/orca.
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
       - 'feature/**'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: fork-windows-build-${{ github.ref }}
@@ -87,3 +87,21 @@ jobs:
           path: dist/orca-windows-setup.exe
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          slug="$(printf '%s' "$REF_NAME" | tr -c 'A-Za-z0-9._-' '-')"
+          short="${GITHUB_SHA::7}"
+          tag="win-${slug}-${RUN_NUMBER}"
+          gh release create "$tag" dist/orca-windows-setup.exe \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Windows build: ${REF_NAME} (${short})" \
+            --notes "Unsigned fork build of ${REF_NAME} at ${GITHUB_SHA}. SmartScreen: More info, then Run anyway. Decline Orca's in-app update prompts: they install official Orca." \
+            --latest
